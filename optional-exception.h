@@ -5,7 +5,7 @@
 #define OPTIONAL_EXCEPTION_H
 #include <stdexcept>
 
-struct bad_optional_access : public std::runtime_error {
+struct bad_optional_access : std::runtime_error {
     bad_optional_access(const std::string& message) : runtime_error(message){}
 };
 #endif

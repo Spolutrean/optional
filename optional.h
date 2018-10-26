@@ -8,33 +8,27 @@
 
 template <typename T>
 struct optional {
-    optional(): valid(false), storage(nullptr) {}
+    optional(): valid(false) {}
 
-    optional(T const& otherVal):valid(true), storage(new T(otherVal)) {}
+    optional(T const& otherVal):valid(true) {
+        new(&storage) T(otherVal);
+    }
 
     optional(optional const& otherOptional):valid(otherOptional.valid) {
         if(otherOptional.valid) {
-            storage = new T(*otherOptional.storage);
-        } else {
-            storage = nullptr;
+            new(&storage) T(*otherOptional);
         }
     }
 
     optional& operator=(optional const& other) {
-        if(storage == other.storage) {
-            return *this;
-        }
-        clear();
-        if(other.valid) {
-            valid = other.valid;
-            storage = new T(*other.storage);
-        }
-        return (*this);
+        optional<T> forSwap(other);
+        swap(*this, forSwap);
+        return *this;
     }
 
     void clear(){
         if(valid) {
-            delete storage;
+            reinterpret_cast<T*>(&storage)->~T();
         }
         valid = false;
     }
@@ -45,7 +39,7 @@ struct optional {
 
     T& operator*() {
         if(valid) {
-            return *storage;
+            return *(reinterpret_cast<T*>(&storage));
         }
         else {
             throw bad_optional_access("Resourse is undefined");
@@ -54,7 +48,7 @@ struct optional {
 
     T const& operator*() const {
         if(valid) {
-            return *storage;
+            return *(reinterpret_cast<T const *>(&storage));
         }
         else {
             throw bad_optional_access("Resourse is undefined");
@@ -62,17 +56,15 @@ struct optional {
     }
 
     T const* operator->() const {
-        return storage;
+        return reinterpret_cast<T const*>(&storage);
     }
 
     T* operator->() {
-        return storage;
+        return reinterpret_cast<T *>(&storage);
     }
 
     ~optional(){
-        if(valid) {
-            delete storage;
-        }
+        clear();
     }
 
     template<typename F>
@@ -80,13 +72,24 @@ struct optional {
 
 private:
     bool valid;
-    T* storage;
+    typename std::aligned_storage<sizeof(T), alignof(T)>::type storage;
+    T& getOriginalType() {
+        return *reinterpret_cast<T*>(&storage);
+    }
 };
 
 template<typename F>
 void swap(optional<F> &a, optional<F> &b) {
+    if(a && b) {
+        std::swap(*reinterpret_cast<F*>(&a.storage), *reinterpret_cast<F*>(&b.storage));
+    } else if(a) {
+        new(&b.storage) F(*reinterpret_cast<F*>(&a.storage));
+        reinterpret_cast<F*> (&a.storage)->~F();
+    } else if(b) {
+        new(&a.storage) F(*reinterpret_cast<F*>(&b.storage));
+        reinterpret_cast<F*> (&b.storage)->~F();
+    }
     std::swap(a.valid, b.valid);
-    std::swap(a.storage, b.storage);
 }
 
 template<typename T>
