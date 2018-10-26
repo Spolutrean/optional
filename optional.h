@@ -20,9 +20,10 @@ struct optional {
         }
     }
 
+    //strong
     optional& operator=(optional const& other) {
-        optional<T> forSwap(other);
-        swap(*this, forSwap);
+        optional<T> forSwap(other); //noexcept
+        swap(*this, forSwap); //strong
         return *this;
     }
 
@@ -73,23 +74,25 @@ struct optional {
 private:
     bool valid;
     typename std::aligned_storage<sizeof(T), alignof(T)>::type storage;
-    T& getOriginalType() {
+    T& getInstance() {
         return *reinterpret_cast<T*>(&storage);
     }
 };
 
 template<typename F>
 void swap(optional<F> &a, optional<F> &b) {
-    if(a && b) {
-        std::swap(*reinterpret_cast<F*>(&a.storage), *reinterpret_cast<F*>(&b.storage));
-    } else if(a) {
-        new(&b.storage) F(*reinterpret_cast<F*>(&a.storage));
-        reinterpret_cast<F*> (&a.storage)->~F();
-    } else if(b) {
-        new(&a.storage) F(*reinterpret_cast<F*>(&b.storage));
-        reinterpret_cast<F*> (&b.storage)->~F();
-    }
-    std::swap(a.valid, b.valid);
+    try {
+        if (a && b) {
+            std::swap(a.getInstance(), b.getInstance());
+        } else if (a) {
+            new(&b.storage) F(a.getInstance());
+            a.getInstance().~F();
+        } else if (b) {
+            new(&a.storage) F(b.getInstance());
+            b.getInstance().~F();
+        }
+        std::swap(a.valid, b.valid);
+    } catch (...) {}
 }
 
 template<typename T>
